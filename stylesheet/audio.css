@@ -13,22 +13,80 @@
 	display: inline-block;
 	margin-bottom: 10px;
 }
-.stop-btn {
+
+/* ★文字依存をなくすため、PLAYボタンとSTOPボタンの共通ベースを設定 */
+.play-btn, .stop-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 45px;  /* ボタンの幅を固定 */
+	height: 35px; /* ボタンの高さを固定 */
 	background: #000;
-	color: #00ff00;
 	border: 1px solid #00ff00;
 	font-family: inherit;
 	font-size: 0.9rem;
-	padding: 6px 15px;
-	margin-left: 5px;
+	padding: 0;   /* アイコンを中央に配置するためパディングをリセット */
 	cursor: pointer;
 	transition: all 0.2s ease;
+	vertical-align: middle;
 }
+
+.stop-btn {
+	margin-left: 5px;
+}
+
+.play-btn:hover {
+	background: #00ff00;
+	box-shadow: 0 0 10px #00ff00;
+}
+
 .stop-btn:hover {
 	background: #ff0000; /* 停止ボタンはホバーで赤く光る */
 	color: #000;
 	border-color: #ff0000;
 	box-shadow: 0 0 10px #ff0000;
+}
+
+/* ★CSSで描く再生アイコン（右向きの緑色の三角形） */
+.icon-play {
+	display: inline-block;
+	width: 0;
+	height: 0;
+	border-top: 6px solid transparent;
+	border-bottom: 6px solid transparent;
+	border-left: 10px solid #00ff00; /* 左の枠線を伸ばして三角を作る */
+	margin-left: 2px; /* 位置の微調整 */
+	transition: border-left-color 0.2s ease;
+}
+.play-btn:hover .icon-play {
+	border-left-color: #000; /* ホバー時は矢印が黒くなる */
+}
+
+/* ★CSSで描く一時停止アイコン（オレンジの二本線） */
+.icon-pause {
+	display: inline-block;
+	width: 10px;
+	height: 12px;
+	border-left: 3px solid #ffaa00;   /* 左の縦線 */
+	border-right: 3px solid #ffaa00;  /* 右の縦線 */
+	box-sizing: border-box;
+	transition: border-color 0.2s ease;
+}
+.play-btn:hover .icon-pause {
+	border-left-color: #000;  /* ホバー時は二本線が黒くなる */
+	border-right-color: #000;
+}
+
+/* ★CSSで描く停止アイコン（緑色の正方形） */
+.icon-stop {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	background: #00ff00;
+	transition: background 0.2s ease;
+}
+.stop-btn:hover .icon-stop {
+	background: #000; /* ホバー時は四角が黒くなる */
 }
 
 /* プログレスバー（シークバー）の外枠 */
@@ -41,8 +99,9 @@
 	cursor: pointer;
 	position: relative;
 }
-/* 中身の進捗バー */
-.progress-bar {
+
+/* 中身の進捗バー（JS側の表記ブレを考慮して両方のクラスに対応） */
+.progress-bar, .progressBar {
 	width: 0%;
 	height: 100%;
 	background: #00ff00;
@@ -65,6 +124,7 @@
 	background: #004400; /* 通常時は沈んでいる */
 	transition: height 0.2s ease;
 }
+
 /* 再生中（playingクラス追加時）に個別の速度でピコピコ動く */
 .waveform-visualizer.playing .bar {
 	background: #ff0000;
