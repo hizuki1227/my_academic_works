@@ -32,12 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
 				const isSelected = (index === lastVerIndex) ? 'selected' : '';
 				verOptionsHTML += `<option value="${index}" ${isSelected}>${v.ver}</option>`;
 			});
-			const verSelectStyle = song.versions.length <= 1 ? 'style="display:none;"' : '';
 
-			// HTMLの骨組みを出力（★ボタンの中身を環境依存文字から、CSS制御用のspanタグに変更）
+			// HTMLの骨組みを出力（★タイトルの左側にステータスバッジ用spanを配置）
 			songItem.innerHTML = `
 				<div class="song-header">
-					<span class="song-title">♪ ${song.title}</span>
+					<span class="song-title">
+						<span class="status-badge ${song.status}"></span>
+						♪ ${song.title}
+					</span>
 					<span class="song-date">Up: ${song.date}</span>
 				</div>
 				
@@ -47,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				</div>
 
 				<div class="song-meta">
-					<select class="ver-select" ${verSelectStyle}>${verOptionsHTML}</select>
+					<select class="ver-select">${verOptionsHTML}</select>
 					<select class="type-select"></select>
 					<span class="song-time">Time: <span class="time-val"></span></span>
 				</div>
@@ -99,12 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
 			const statusEl = songItem.querySelector('.player-status');
 			const stopBtnEl = songItem.querySelector('.stop-btn');
 			const progressContainerEl = songItem.querySelector('.progress-container');
-			const progressBarEl = songItem.querySelector('.progress-bar'); // ※クラス名に合わせ修正
+			const progressBarEl = songItem.querySelector('.progress-bar');
 			const visualizerEl = songItem.querySelector('.waveform-visualizer');
 			const currentTimeValEl = songItem.querySelector('.current-time-val');
 			const durationTimeValEl = songItem.querySelector('.duration-time-val');
 
-			// ★ボタン内のアイコン要素のキャッシュ
+			// ボタン内のアイコン要素のキャッシュ
 			const iconPlayEl = playBtnEl.querySelector('.icon-play');
 			const iconPauseEl = playBtnEl.querySelector('.icon-pause');
 
@@ -114,6 +116,15 @@ document.addEventListener('DOMContentLoaded', () => {
 				const mins = Math.floor(seconds / 60);
 				const secs = Math.floor(seconds % 60);
 				return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+			}
+
+			// バージョン選択メニューの活性・非活性を制御
+			if (song.versions.length <= 1) {
+				verSelectEl.disabled = true;
+				verSelectEl.style.opacity = "0.6";
+			} else {
+				verSelectEl.disabled = false;
+				verSelectEl.style.opacity = "1.0";
 			}
 
 			// ② タイプ（インスト等）の選択肢を動的に書き換える関数
@@ -163,20 +174,20 @@ document.addEventListener('DOMContentLoaded', () => {
 				durationTimeValEl.textContent = formatTime(audioEl.duration);
 			});
 
-			// ③ 再生・一時停止の挙動をコントロールするイベント（文字の書き換えから、アイコンの表示/非表示に修正）
+			// ③ 再生・一時停止の挙動をコントロールするイベント
 			playBtnEl.addEventListener('click', () => {
 				if (audioEl.paused) {
 					audioEl.play();
 					playBtnEl.classList.add('playing');
 					iconPlayEl.style.display = 'none';
-					iconPauseEl.style.display = 'inline-block'; // 一時停止アイコンを表示
+					iconPauseEl.style.display = 'inline-block';
 					visualizerEl.classList.add('playing');
 					statusEl.textContent = 'PLAYING...';
 					statusEl.classList.add('playing');
 				} else {
 					audioEl.pause();
 					playBtnEl.classList.remove('playing');
-					iconPlayEl.style.display = 'inline-block'; // 再生アイコンを表示
+					iconPlayEl.style.display = 'inline-block';
 					iconPauseEl.style.display = 'none';
 					visualizerEl.classList.remove('playing');
 					statusEl.textContent = 'PAUSED';
@@ -184,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				}
 			});
 
-			// ④ ストップボタンのイベント（再生停止＋アイコンリセット）
+			// ④ ストップボタンのイベント
 			stopBtnEl.addEventListener('click', () => {
 				audioEl.pause();
 				audioEl.currentTime = 0;
@@ -263,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				statusEl.textContent = 'READY';
 			});
 
-			// ★【新規追記】外部ファイル化したダウンロード機構をここでドッキング
+			// 外部ファイル化したダウンロード機構をここでドッキング
 			if (typeof DownloadHandler !== 'undefined') {
 				DownloadHandler.setup(songItem, song, verSelectEl, typeSelectEl);
 			}
