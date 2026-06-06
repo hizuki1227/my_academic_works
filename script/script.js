@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				verOptionsHTML += `<option value="${index}" ${isSelected}>${v.ver}</option>`;
 			});
 
-			// HTMLの骨組みを出力（★タイトルの左側にステータスバッジ用spanを配置）
+			// HTMLの骨組みを出力（指定の英語クラス名に合わせたステータスバッジを出力）
 			songItem.innerHTML = `
 				<div class="song-header">
 					<span class="song-title">
@@ -274,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				statusEl.textContent = 'READY';
 			});
 
-			// 外部ファイル化したダウンロード機構をここでドッキング
+			// 外部ファイル化したダウンロード機構をドッキング
 			if (typeof DownloadHandler !== 'undefined') {
 				DownloadHandler.setup(songItem, song, verSelectEl, typeSelectEl);
 			}
