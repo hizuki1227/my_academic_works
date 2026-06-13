@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Music Database Management</title>
+  <style>
+    body { 
+      font-family: monospace; 
+      background: #121212; 
+      color: #aaaaaa; 
+      margin: 0; 
+      padding: 0;
+      display: flex; 
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .sidebar {
+      width: 280px;
+      background: #1a1a1a;
+      border-right: 1px solid #333333;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .sidebar-header {
+      padding: 15px;
+      border-bottom: 1px solid #333333;
+      background: #0a0a0a;
+    }
+    .sidebar-title { font-size: 0.9rem; font-weight: bold; color: #ffffff; margin: 0 0 5px 0; }
+    #status-msg { font-size: 0.75rem; color: #888888; min-height: 25px; line-height: 1.2; }
+    
+    .sidebar-actions { padding: 10px; border-bottom: 1px solid #333333; background: #151515; }
+    
+    .project-list { flex: 1; overflow-y: auto; }
+    .project-item {
+      padding: 10px 15px;
+      cursor: pointer;
+      border-bottom: 1px solid #222222;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .project-item:hover { background: #222222; }
+    .project-item.active { background: #2a2a2a; border-left: 3px solid #ffffff; color: #ffffff; }
+    
+    .status-text { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+    .status-progress { color: #ccaa00; }
+    .status-completed { color: #00aa00; }
+    .status-rejection { color: #aa0000; }
+    .status-cancel { color: #666666; }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #121212;
+    }
+    
+    .top-bar {
+      background: #0a0a0a;
+      padding: 12px 20px;
+      border-bottom: 1px solid #333333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .editor-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    
+    .project-meta-pane {
+      width: 320px;
+      border-right: 1px solid #333333;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: #151515;
+    }
+    
+    .versions-pane {
+      flex: 1;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: #121212;
+    }
+
+    .section-title { font-size: 0.85rem; font-weight: bold; color: #ffffff; margin: 0 0 15px 0; text-transform: uppercase; border-bottom: 1px solid #333333; padding-bottom: 5px; }
+    .version-card { border: 1px solid #333333; padding: 15px; margin-bottom: 20px; background: #161616; }
+    .track-card { border: 1px solid #2a2a2a; padding: 8px; margin: 8px 0 8px 20px; background: #1a1a1a; }
+
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 0.75rem; font-weight: bold; color: #888888; margin-bottom: 4px; text-transform: uppercase; }
+    input, textarea, select { 
+      width: 100%; padding: 6px; box-sizing: border-box; 
+      background: #000000; color: #ffffff; border: 1px solid #333333; 
+      font-family: inherit; font-size: 0.8rem;
+    }
+    textarea { height: 60px; resize: vertical; }
+
+    .sort-controls { display: flex; gap: 4px; }
+    .card-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: #222222; padding: 4px 8px; }
+    .card-title { font-size: 0.8rem; font-weight: bold; color: #ffffff; }
+
+    button { 
+      background: #222222; color: #ffffff; border: 1px solid #444444; 
+      padding: 4px 8px; font-size: 0.75rem; cursor: pointer; font-family: inherit; 
+    }
+    button:hover { background: #333333; border-color: #666666; }
+    .btn-accent { background: #ffffff; color: #000000; border: 1px solid #ffffff; font-weight: bold; }
+    .btn-accent:hover { background: #cccccc; }
+    
+    .empty-state { text-align: center; color: #444444; padding-top: 100px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">DATABASE INDEX</div>
+      <div id="status-msg">Syncing...</div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn-accent" style="width: 100%;" onclick="addProjectAtTop()">+ CREATE NEW PROJECT</button>
+    </div>
+    <div class="project-list" id="project-list-container"></div>
+  </div>
+
+  <div class="main-content">
+    <div class="top-bar">
+      <div><button onclick="loadInitialJSON()">FETCH DB</button></div>
+      <div><button class="btn-accent" onclick="downloadJSON()">DOWNLOAD SONGS.JSON</button></div>
+    </div>
+    
+    <div class="editor-layout" id="editor-layout-container">
+      <div class="empty-state">Select a project from the left index.</div>
+    </div>
+  </div>
+
+  <script>
+    const JSON_URL = 'https://www.ungleangle.net/script/songs.json';
+    let projectData = [];
+    let currentActiveIndex = null;
+
+    window.addEventListener('DOMContentLoaded', loadInitialJSON);
+
+    function loadInitialJSON() {
+      const statusMsg = document.getElementById('status-msg');
+      statusMsg.innerText = 'Fetching JSON...';
+      fetch(JSON_URL, { cache: 'no-store' })
+        .then(res => { if (!res.ok) throw new Error(res.status); return res.json(); })
+        .then(data => { 
+          projectData = data; 
+          statusMsg.innerText = `Sync complete.\nTotal records: ${projectData.length}`; 
+          if(projectData.length > 0 && currentActiveIndex === null) { currentActiveIndex = 0; }
+          refreshUI();
+        })
+        .catch(err => { statusMsg.innerText = 'Fetch failed. Check CORS/Path.'; console.error(err); });
+    }
+
+    function refreshUI() {
+      renderSidebar();
+      renderEditorLayout();
+    }
+
+    function renderSidebar() {
+      const container = document.getElementById('project-list-container');
+      // サイドバー更新時にスクロール位置を逃がす
+      const currentScroll = container ? container.scrollTop : 0;
+      container.innerHTML = '';
+
+      projectData.forEach((proj, pIdx) => {
+        const item = document.createElement('div');
+        item.className = `project-item ${pIdx === currentActiveIndex ? 'active' : ''}`;
+        item.onclick = () => { currentActiveIndex = pIdx; renderEditorLayout(); highlightSidebarItem(pIdx); };
+        
+        const status = proj.status || 'progress';
+        item.innerHTML = `
+          <span style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px;" id="sidebar-title-${pIdx}">
+            ${proj.title || '(Untitled)'}
+          </span>
+          <span class="status-text status-${status}" id="sidebar-status-${pIdx}">${status}</span>
+        `;
+        container.appendChild(item);
+      });
+      container.scrollTop = currentScroll;
+    }
+
+    function highlightSidebarItem(pIdx) {
+      document.querySelectorAll('.project-item').forEach((item, idx) => {
+        item.classList.toggle('active', idx === pIdx);
+      });
+    }
+
+    // 🛠️ 改善：画面のチラつきとスクロール飛びを完全に防ぐ共通ラッパー
+    function renderEditorWithScrollPreserved() {
+      const pane = document.querySelector('.versions-pane');
+      const metaPane = document.querySelector('.project-meta-pane');
+      const scrollTop = pane ? pane.scrollTop : 0;
+      const metaScrollTop = metaPane ? metaPane.scrollTop : 0;
+
+      renderEditorLayout();
+
+      const newPane = document.querySelector('.versions-pane');
+      const newMetaPane = document.querySelector('.project-meta-pane');
+      if (newPane) newPane.scrollTop = scrollTop;
+      if (newMetaPane) newMetaPane.scrollTop = metaScrollTop;
+    }
+
+    function renderEditorLayout() {
+      const container = document.getElementById('editor-layout-container');
+      if (currentActiveIndex === null || !projectData[currentActiveIndex]) {
+        container.innerHTML = '<div class="empty-state">No project selected.</div>';
+        return;
+      }
+
+      const proj = projectData[currentActiveIndex];
+      const pIdx = currentActiveIndex;
+
+      container.innerHTML = `
+        <div class="project-meta-pane">
+          <div class="section-title">Project Metadata</div>
+          
+          <div class="form-group">
+            <label>Project Sorting</label>
+            <div class="sort-controls">
+              <button onclick="moveProjectUp(${pIdx})" ${pIdx === 0 ? 'disabled' : ''}>MOVE UP</button>
+              <button onclick="moveProjectDown(${pIdx})" ${pIdx === projectData.length - 1 ? 'disabled' : ''}>MOVE DOWN</button>
+            </div>
+          </div>
+
+          <div class="form-group"><label>ID</label><input type="text" value="${proj.id || ''}" onchange="projectData[${pIdx}].id=this.value"></div>
+          
+          <div class="form-group"><label>Title</label><input type="text" value="${proj.title || ''}" oninput="updateProjectTitle(${pIdx}, this.value)"></div>
+          <div class="form-group"><label>Date</label><input type="text" value="${proj.date || ''}" onchange="projectData[${pIdx}].date=this.value"></div>
+          
+          <div class="form-group">
+            <label>Status</label>
+            <select onchange="updateProjectStatus(${pIdx}, this.value)">
+              <option value="progress" ${proj.status === 'progress' ? 'selected' : ''}>PROGRESS</option>
+              <option value="completed" ${proj.status === 'completed' ? 'selected' : ''}>COMPLETED</option>
+              <option value="rejection" ${proj.status === 'rejection' ? 'selected' : ''}>REJECTION</option>
+              <option value="cancel" ${proj.status === 'cancel' ? 'selected' : ''}>CANCEL</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Project Comment</label>
+            <textarea onchange="projectData[${pIdx}].project_comment=this.value">${proj.project_comment || ''}</textarea>
+          </div>
+          
+          <div style="margin-top:40px;">
+            <button style="width:100%; background:#331111; border-color:#552222; color:#ffaaaa;" onclick="deleteProject(${pIdx})">DELETE PROJECT</button>
+          </div>
+        </div>
+
+        <div class="versions-pane">
+          <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Version History</span>
+            <button class="btn-accent" style="margin-left:auto;" onclick="addVersion(${pIdx})">+ ADD VERSION</button>
+          </div>
+          <div id="versions-list-container"></div>
+        </div>
+      `;
+
+      renderVersions(proj, pIdx);
+    }
+
+    // 🛠️ 最最適化: 全体描画を走らせずにサイドバーと同期させる軽量インライン更新
+    function updateProjectTitle(pIdx, val) {
+      projectData[pIdx].title = val;
+      const el = document.getElementById(`sidebar-title-${pIdx}`);
+      if(el) el.innerText = val || '(Untitled)';
+    }
+
+    function updateProjectStatus(pIdx, val) {
+      projectData[pIdx].status = val;
+      const el = document.getElementById(`sidebar-status-${pIdx}`);
+      if(el) {
+        el.innerText = val;
+        el.className = `status-text status-${val}`;
+      }
+    }
+
+    function renderVersions(proj, pIdx) {
+      const container = document.getElementById('versions-list-container');
+      container.innerHTML = '';
+
+      if (!proj.versions || proj.versions.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding-top:30px;">No versions available.</div>';
+        return;
+      }
+
+      proj.versions.forEach((ver, vIdx) => {
+        const verCard = document.createElement('div');
+        verCard.className = 'version-card';
+        verCard.innerHTML = `
+          <div class="card-header-actions">
+            <span class="card-title">VERSION #${vIdx + 1}: ${ver.ver || 'UNTITLED'}</span>
+            <div class="sort-controls">
+              <button onclick="moveVersionUp(${pIdx}, ${vIdx})" ${vIdx === 0 ? 'disabled' : ''}>UP</button>
+              <button onclick="moveVersionDown(${pIdx}, ${vIdx})" ${vIdx === proj.versions.length - 1 ? 'disabled' : ''}>DOWN</button>
+              <button style="color:#ff8888; margin-left:10px;" onclick="deleteVersion(${pIdx}, ${vIdx})">REMOVE</button>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Version Name</label>
+            <input type="text" value="${ver.ver || ''}" onchange="projectData[${pIdx}].versions[${vIdx}].ver=this.value; renderEditorWithScrollPreserved();">
+          </div>
+          <div class="form-group">
+            <label>Version Comment</label>
+            <textarea onchange="projectData[${pIdx}].versions[${vIdx}].ver_comment=this.value">${ver.ver_comment || ''}</textarea>
+          </div>
+
+          <div style="margin: 15px 0 5px 20px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.75rem; font-weight:bold; color:#666;">TRACKS (TYPES)</span>
+            <button onclick="addTrack(${pIdx}, ${vIdx})">+ ADD TRACK</button>
+          </div>
+          <div id="tracks-list-container-${vIdx}"></div>
+        `;
+        container.appendChild(verCard);
+
+        const trackContainer = document.getElementById(`tracks-list-container-${vIdx}`);
+        if (ver.types && ver.types.length > 0) {
+          ver.types.forEach((track, tIdx) => {
+            const trackCard = document.createElement('div');
+            trackCard.className = 'track-card';
+            trackCard.innerHTML = `
+              <div class="card-header-actions" style="background:#111111; margin-bottom:5px;">
+                <span class="card-title" style="color:#888;">TRACK #${tIdx + 1}</span>
+                <div class="sort-controls">
+                  <button onclick="moveTrackUp(${pIdx}, ${vIdx}, ${tIdx})" ${tIdx === 0 ? 'disabled' : ''}>UP</button>
+                  <button onclick="moveTrackDown(${pIdx}, ${vIdx}, ${tIdx})" ${tIdx === ver.types.length - 1 ? 'disabled' : ''}>DOWN</button>
+                  <button style="color:#ff8888; margin-left:5px;" onclick="deleteTrack(${pIdx}, ${vIdx}, ${tIdx})">X</button>
+                </div>
+              </div>
+              <div class="form-group"><label>Track Type / Name</label><input type="text" value="${track.name || ''}" onchange="projectData[${pIdx}].versions[${vIdx}].types[${tIdx}].name=this.value"></div>
+              <div class="form-group"><label>Time</label><input type="text" value="${track.time || ''}" onchange="projectData[${pIdx}].versions[${vIdx}].types[${tIdx}].time=this.value"></div>
+              <div class="form-group"><label>File Path</label><input type="text" value="${track.file || ''}" onchange="projectData[${pIdx}].versions[${vIdx}].types[${tIdx}].file=this.value"></div>
+            `;
+            trackContainer.appendChild(trackCard);
+          });
+        }
+      });
+    }
+
+    /* ─── SORTING ENGINE ─── */
+    function swap(arr, a, b) { [arr[a], arr[b]] = [arr[b], arr[a]]; } // 🛠️ 冗長な temp 代入を JS標準の分割代入に最適化
+
+    function moveProjectUp(pIdx) { if(pIdx > 0) { swap(projectData, pIdx, pIdx - 1); currentActiveIndex = pIdx - 1; refreshUI(); } }
+    function moveProjectDown(pIdx) { if(pIdx < projectData.length - 1) { swap(projectData, pIdx, pIdx + 1); currentActiveIndex = pIdx + 1; refreshUI(); } }
+
+    function moveVersionUp(pIdx, vIdx) { if(vIdx > 0) { swap(projectData[pIdx].versions, vIdx, vIdx - 1); renderEditorWithScrollPreserved(); } }
+    function moveVersionDown(pIdx, vIdx) { if(vIdx < projectData[pIdx].versions.length - 1) { swap(projectData[pIdx].versions, vIdx, vIdx + 1); renderEditorWithScrollPreserved(); } }
+
+    function moveTrackUp(pIdx, vIdx, tIdx) { if(tIdx > 0) { swap(projectData[pIdx].versions[vIdx].types, tIdx, tIdx - 1); renderEditorWithScrollPreserved(); } }
+    function moveTrackDown(pIdx, vIdx, tIdx) { if(tIdx < projectData[pIdx].versions[vIdx].types.length - 1) { swap(projectData[pIdx].versions[vIdx].types, tIdx, tIdx + 1); renderEditorWithScrollPreserved(); } }
+
+    /* ─── DATA ENGINE ─── */
+    function addProjectAtTop() {
+      projectData.unshift({
+        id: `project-${String(projectData.length + 1).padStart(2, '0')}`, // 🛠️ 冗長な文字列結合をテンプレートリテラルに統一
+        title: "NEW PROJECT",
+        date: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
+        status: "progress",
+        project_comment: "",
+        versions: []
+      });
+      currentActiveIndex = 0;
+      refreshUI();
+      const sidebarList = document.querySelector('.project-list');
+      if (sidebarList) sidebarList.scrollTop = 0;
+    }
+
+    function deleteProject(pIdx) {
+      if (confirm('Permanently delete this project?')) {
+        projectData.splice(pIdx, 1);
+        currentActiveIndex = projectData.length > 0 ? 0 : null;
+        refreshUI();
+      }
+    }
+
+    function addVersion(pIdx) {
+      if (!projectData[pIdx].versions) projectData[pIdx].versions = [];
+      projectData[pIdx].versions.push({
+        ver: "v1.0.0 [DEMO]",
+        ver_comment: "",
+        types: [{ name: "Original Mix", time: "00:00", file: "" }]
+      });
+      renderEditorWithScrollPreserved();
+    }
+    
+    function deleteVersion(pIdx, vIdx) { 
+      if(confirm('Delete this version?')) { 
+        projectData[pIdx].versions.splice(vIdx, 1); 
+        renderEditorWithScrollPreserved(); 
+      } 
+    }
+
+    function addTrack(pIdx, vIdx) {
+      if (!projectData[pIdx].versions[vIdx].types) projectData[pIdx].versions[vIdx].types = [];
+      projectData[pIdx].versions[vIdx].types.push({ name: "Backing Track", time: "00:00", file: "" });
+      renderEditorWithScrollPreserved();
+    }
+    
+    function deleteTrack(pIdx, vIdx, tIdx) { 
+      projectData[pIdx].versions[vIdx].types.splice(tIdx, 1); 
+      renderEditorWithScrollPreserved(); 
+    }
+
+    function downloadJSON() {
+      if (projectData.length === 0) { alert('Database is empty.'); return; }
+      const blob = new Blob([JSON.stringify(projectData, null, 4)], { type: 'application/json' }); // 🛠️ 変数宣言を省きメモリ節約
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'songs.json'; a.click(); URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
